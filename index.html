@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>個人介紹</title>
+    <title>胡智強的個人頁面</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -53,30 +53,83 @@
             bottom: 0;
             width: 100%;
         }
+        .tabs {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .tabs button {
+            padding: 10px 20px;
+            margin: 5px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .tabs button:hover {
+            background-color: #45a049;
+        }
+        .tab-content {
+            display: none;
+        }
+        .active {
+            display: block;
+        }
     </style>
 </head>
 <body>
 
 <header>
-    <h1>歡迎來到我的個人介紹頁面</h1>
+    <h1>歡迎來到我的個人頁面</h1>
 </header>
 
 <div class="container">
-    <h2>你好，我是胡智強</h2>
-    <p>
-        我是一名學生，來自高雄科技大學電子工程系。
-    </p>
+    <!-- 按鈕列 -->
+    <div class="tabs">
+        <button onclick="showTab('intro')">自我介紹</button>
+        <button onclick="showTab('monitoring')">遠端監控</button>
+        <button onclick="showTab('bloodPressure')">血壓偵測</button>
+    </div>
 
-    <h3>聯絡方式</h3>
-    <p>你可以通過以下方式與我聯繫：</p>
-    <ul class="social-links">
-        <li><a href="mailto:c111252210@nkust.edu.tw">Email</a></li>
-    </ul>
+    <!-- 分頁內容：自我介紹 -->
+    <div id="intro" class="tab-content active">
+        <h2>你好，我是胡智強</h2>
+        <p>我是一名學生，來自高雄科技大學電子工程系大四。</p>
+	
+
+        <h3>聯絡方式</h3>
+        <p>你可以通過以下方式與我聯繫：</p>
+        <ul class="social-links">
+            <li><a href="mailto:c111252210@nkust.edu.tw">Email</a></li>
+        </ul>
+    </div>
+
+    <!-- 分頁內容：遠端監控 -->
+    <div id="monitoring" class="tab-content">
+        <h2>遠端監控</h2>
+        <p>這裡未來會新增遠端監控的相關成果。</p>
+    </div>
+
+    <!-- 分頁內容：血壓偵測 -->
+    <div id="bloodPressure" class="tab-content">
+        <h2>血壓偵測</h2>
+        <p>這裡未來會更新血壓偵測的相關成果。</p>
+    </div>
 </div>
 
 <footer>
     <p>© 2025 胡智強. All Rights Reserved.</p>
 </footer>
+
+<script>
+    function showTab(tabName) {
+        const tabs = document.querySelectorAll('.tab-content');
+        tabs.forEach(tab => tab.classList.remove('active'));
+
+        const activeTab = document.getElementById(tabName);
+        activeTab.classList.add('active');
+    }
+</script>
 
 </body>
 </html>
