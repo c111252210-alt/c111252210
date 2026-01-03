@@ -208,20 +208,40 @@
 
 <!-- OpenCV.js：等 wasm 初始化後再啟用按鈕 -->
 <script>
-    var Module = {
-        onRuntimeInitialized() {
-            window.__cvReady = true;
-            const s = document.getElementById("bpStatus");
-            const btn = document.getElementById("bpRecognizeBtn");
-            if (s) s.textContent = "OpenCV.js 已就緒 ✅";
-            if (btn) btn.disabled = false;
-        }
-    };
+  // 1) 先準備好 Module 給 opencv.js 使用
+  var Module = {
+    onRuntimeInitialized() {
+      window.__cvReady = true;
+      const s = document.getElementById("bpStatus");
+      const btn = document.getElementById("bpRecognizeBtn");
+      if (s) s.textContent = "OpenCV.js 已就緒 ✅";
+      if (btn) btn.disabled = false;
+    }
+  };
+
+  // 2) fallback：如果 onRuntimeInitialized 沒觸發，用輪詢確認 cv 是否可用
+  (function cvFallback() {
+    const timer = setInterval(() => {
+      const btn = document.getElementById("bpRecognizeBtn");
+      const s = document.getElementById("bpStatus");
+      // cv 真的存在才開按鈕
+      if (typeof cv !== "undefined" && cv.Mat && btn) {
+        window.__cvReady = true;
+        btn.disabled = false;
+        if (s) s.textContent = "OpenCV.js 已就緒 ✅";
+        clearInterval(timer);
+      }
+    }, 200);
+  })();
 </script>
-<script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+
+<!-- 用 defer，確保按順序載入並執行 -->
+<script defer src="https://docs.opencv.org/4.x/opencv.js"></script>
+
 
 <!-- 血壓辨識主程式：請把我之前給你的 bp.js 放在同層 -->
 <script src="./bp.js"></script>
 
 </body>
 </html>
+
