@@ -1,1 +1,12 @@
+body{font-family:system-ui,-apple-system,"Segoe UI",Arial;max-width:900px;margin:0 auto;padding:16px;line-height:1.5}
+h2{margin:0 0 8px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.card{border:1px solid #eee;border-radius:12px;padding:12px;margin:12px 0}
+button{padding:8px 12px;cursor:pointer}
+input{padding:6px 8px}
+small{color:#666}
+canvas,img{max-width:100%;border:1px solid #ddd;border-radius:10px}
+.kpi{font-size:20px;font-weight:700}
+.bad{color:#b00020;font-weight:700}
+.good{color:#0a7a2f;font-weight:700}
 
