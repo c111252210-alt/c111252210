@@ -1,107 +1,137 @@
-// ====== 小工具：localStorage 歷史 ======
 const LS_KEY = "bp_history_v1";
 let history = JSON.parse(localStorage.getItem(LS_KEY) || "[]");
 
-function saveHistory() {
+function $(id){ return document.getElementById(id); }
+function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
+function avg(arr){ return arr.reduce((a,b)=>a+b,0)/arr.length; }
+
+function renderHistory(){
+  const el = $("bpHistory");
+  if (!el) return;
+  if (!history.length) { el.innerHTML = "<small>尚無資料</small>"; return; }
+  el.innerHTML = history.map(h =>
+    `<div><b>t=${h.t}</b> SYS=${h.sys} / DIA=${h.dia} <small>(${new Date(h.ts).toLocaleString()})</small></div>`
+  ).join("");
+}
+function saveHistory(){
   localStorage.setItem(LS_KEY, JSON.stringify(history));
   renderHistory();
 }
-
-function renderHistory() {
-  const el = document.getElementById("history");
-  if (!history.length) {
-    el.innerHTML = "<small>尚無資料</small>";
-    return;
-  }
-  const rows = history.map(h =>
-    `<div><b>t=${h.t}</b> SYS=${h.sys} / DIA=${h.dia} <small>(${new Date(h.ts).toLocaleString()})</small></div>`
-  ).join("");
-  el.innerHTML = rows;
-}
 renderHistory();
 
-// ====== UI ======
-const fileEl = document.getElementById("file");
-const previewEl = document.getElementById("preview");
-const canvasEl = document.getElementById("canvas");
-const statusEl = document.getElementById("status");
-const resultEl = document.getElementById("result");
-const judgeOutEl = document.getElementById("judgeOut");
+let last = { sys:null, dia:null, confidence:0 };
 
-let last = { sys: null, dia: null, confidence: 0 };
+// ===== 七段 mapping =====
+const SEG_MAP = new Map([
+  ["1111110", 0],
+  ["0110000", 1],
+  ["1101101", 2],
+  ["1111001", 3],
+  ["0110011", 4],
+  ["1011011", 5],
+  ["1011111", 6],
+  ["1110000", 7],
+  ["1111111", 8],
+  ["1111011", 9],
+]);
 
-fileEl.addEventListener("change", () => {
-  const f = fileEl.files?.[0];
-  if (!f) return;
-  previewEl.src = URL.createObjectURL(f);
-  resultEl.textContent = "已選擇圖片，按「辨識」";
-  judgeOutEl.textContent = "";
-});
+// ===== UI 綁定（等 DOM ready）=====
+window.addEventListener("DOMContentLoaded", () => {
+  const fileEl = $("bpFile");
+  const previewEl = $("bpPreview");
+  const canvasEl = $("bpCanvas");
+  const statusEl = $("bpStatus");
+  const resultEl = $("bpResult");
+  const judgeOutEl = $("bpJudgeOut");
 
-document.getElementById("btnClear").addEventListener("click", () => {
-  history = [];
-  saveHistory();
-});
+  const recognizeBtn = $("bpRecognizeBtn");
+  const judgeBtn = $("bpJudgeBtn");
+  const clearBtn = $("bpClearBtn");
 
-document.getElementById("btnRecognize").addEventListener("click", async () => {
-  if (!window.__cvReady) { alert("OpenCV.js 尚未載入完成"); return; }
-  const f = fileEl.files?.[0];
-  if (!f) { alert("請先選擇圖片"); return; }
+  if (!fileEl || !previewEl || !canvasEl || !resultEl || !recognizeBtn) return;
 
-  statusEl.textContent = "處理中…";
-  const img = await loadImageFromFile(f);
+  fileEl.addEventListener("change", () => {
+    const f = fileEl.files?.[0];
+    if (!f) return;
+    previewEl.src = URL.createObjectURL(f);
+    resultEl.textContent = "已選擇圖片，按「辨識」";
+    if (judgeOutEl) judgeOutEl.textContent = "";
+  });
 
-  // 把圖畫到 canvas，OpenCV.js 用 cv.imread(canvas) 讀取
-  const ctx = canvasEl.getContext("2d");
-  canvasEl.width = img.naturalWidth;
-  canvasEl.height = img.naturalHeight;
-  ctx.drawImage(img, 0, 0);
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      history = [];
+      saveHistory();
+    });
+  }
 
-  try {
-    const out = recognizeSYS_DIA_FromCanvas(canvasEl);
-    if (out.sys == null || out.dia == null) {
-      resultEl.innerHTML = `<span class="bad">辨識失敗</span>：建議先裁切到螢幕區域、避免反光再試一次`;
-      statusEl.textContent = "就緒";
+  recognizeBtn.addEventListener("click", async () => {
+    if (!window.__cvReady || typeof cv === "undefined") {
+      alert("OpenCV.js 尚未載入完成（請等一下或重新整理）");
       return;
     }
+    const f = fileEl.files?.[0];
+    if (!f) { alert("請先選擇圖片"); return; }
 
-    last = out;
-    resultEl.innerHTML = `SYS: <b>${out.sys}</b> / DIA: <b>${out.dia}</b>（confidence: ${out.confidence.toFixed(2)}）`;
+    if (statusEl) statusEl.textContent = "處理中…";
 
-    history.push({ t: history.length, sys: out.sys, dia: out.dia, ts: Date.now() });
-    saveHistory();
+    const img = await loadImageFromFile(f);
 
-    document.getElementById("btnJudge").disabled = false;
-    statusEl.textContent = "就緒 ✅";
-  } catch (e) {
-    console.error(e);
-    resultEl.innerHTML = `<span class="bad">錯誤</span>：${String(e)}`;
-    statusEl.textContent = "就緒";
+    const ctx = canvasEl.getContext("2d");
+    canvasEl.width = img.naturalWidth;
+    canvasEl.height = img.naturalHeight;
+    ctx.drawImage(img, 0, 0);
+
+    try {
+      const out = recognizeSYS_DIA_FromCanvas(canvasEl);
+      if (out.sys == null || out.dia == null) {
+        resultEl.innerHTML = `<span style="color:#b00020;font-weight:bold">辨識失敗</span>：建議先裁切到螢幕區域、避免反光再試一次`;
+        if (statusEl) statusEl.textContent = "就緒";
+        return;
+      }
+
+      last = out;
+      resultEl.innerHTML = `SYS: <b>${out.sys}</b> / DIA: <b>${out.dia}</b>（confidence: ${out.confidence.toFixed(2)}）`;
+
+      history.push({ t: history.length, sys: out.sys, dia: out.dia, ts: Date.now() });
+      saveHistory();
+
+      if (judgeBtn) judgeBtn.disabled = false;
+      if (statusEl) statusEl.textContent = "就緒 ✅";
+    } catch (e) {
+      console.error(e);
+      resultEl.innerHTML = `<span style="color:#b00020;font-weight:bold">錯誤</span>：${String(e)}`;
+      if (statusEl) statusEl.textContent = "就緒";
+    }
+  });
+
+  if (judgeBtn) {
+    judgeBtn.addEventListener("click", () => {
+      if (last.sys == null || last.dia == null) { alert("請先辨識"); return; }
+
+      const t = history.length - 1;
+      const a_sys = parseFloat($("bp_a_sys").value);
+      const b_sys = parseFloat($("bp_b_sys").value);
+      const a_dia = parseFloat($("bp_a_dia").value);
+      const b_dia = parseFloat($("bp_b_dia").value);
+      const thr = parseFloat($("bp_thr").value);
+
+      const s = judgeOne(last.sys, a_sys, b_sys, t, thr);
+      const d = judgeOne(last.dia, a_dia, b_dia, t, thr);
+
+      const overall = (s.out || d.out)
+        ? `<span style="color:#b00020;font-weight:bold">脫模（偏離趨勢）</span>`
+        : `<span style="color:#0a7a2f;font-weight:bold">正常（符合趨勢）</span>`;
+
+      if (judgeOutEl) {
+        judgeOutEl.innerHTML = `
+          <div><b>總結：</b>${overall}</div>
+          <div>SYS：ŷ=${s.yhat.toFixed(2)}，誤差=${s.err.toFixed(2)} → ${s.out ? '<b style="color:#b00020">脫模</b>' : '<b style="color:#0a7a2f">正常</b>'}</div>
+          <div>DIA：ŷ=${d.yhat.toFixed(2)}，誤差=${d.err.toFixed(2)} → ${d.out ? '<b style="color:#b00020">脫模</b>' : '<b style="color:#0a7a2f">正常</b>'}</div>
+        `;
+      }
+    });
   }
-});
-
-document.getElementById("btnJudge").addEventListener("click", () => {
-  if (last.sys == null || last.dia == null) { alert("請先辨識"); return; }
-  const t = history.length - 1;
-
-  const a_sys = parseFloat(document.getElementById("a_sys").value);
-  const b_sys = parseFloat(document.getElementById("b_sys").value);
-  const a_dia = parseFloat(document.getElementById("a_dia").value);
-  const b_dia = parseFloat(document.getElementById("b_dia").value);
-  const thr = parseFloat(document.getElementById("thr").value);
-
-  const s = judgeOne(last.sys, a_sys, b_sys, t, thr);
-  const d = judgeOne(last.dia, a_dia, b_dia, t, thr);
-
-  const overall = (s.out || d.out)
-    ? `<span class="bad">脫模（偏離趨勢）</span>`
-    : `<span class="good">正常（符合趨勢）</span>`;
-
-  judgeOutEl.innerHTML = `
-    <div><b>總結：</b>${overall}</div>
-    <div>SYS：ŷ=${s.yhat.toFixed(2)}，誤差=${s.err.toFixed(2)} → ${s.out ? '<span class="bad">脫模</span>' : '<span class="good">正常</span>'}</div>
-    <div>DIA：ŷ=${d.yhat.toFixed(2)}，誤差=${d.err.toFixed(2)} → ${d.out ? '<span class="bad">脫模</span>' : '<span class="good">正常</span>'}</div>
-  `;
 });
 
 function judgeOne(y, a, b, t, thr) {
@@ -119,34 +149,11 @@ function loadImageFromFile(file) {
   });
 }
 
-// ====== 七段辨識（OpenCV.js） ======
-const SEG_MAP = new Map([
-  ["1111110", 0],
-  ["0110000", 1],
-  ["1101101", 2],
-  ["1111001", 3],
-  ["0110011", 4],
-  ["1011011", 5],
-  ["1011111", 6],
-  ["1110000", 7],
-  ["1111111", 8],
-  ["1111011", 9],
-]);
-
+// ===== OpenCV.js 辨識核心 =====
 function recognizeSYS_DIA_FromCanvas(canvas) {
   let src = cv.imread(canvas);
   let gray = new cv.Mat();
   cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-
-  // 可選：CLAHE（某些 build 沒有也不影響）
-  try {
-    const clahe = new cv.CLAHE(2.0, new cv.Size(8,8));
-    let tmp = new cv.Mat();
-    clahe.apply(gray, tmp);
-    gray.delete();
-    gray = tmp;
-    clahe.delete();
-  } catch (_) {}
 
   let blur = new cv.Mat();
   cv.GaussianBlur(gray, blur, new cv.Size(5,5), 0);
@@ -159,7 +166,6 @@ function recognizeSYS_DIA_FromCanvas(canvas) {
     31, 5
   );
 
-  // morphology open
   let kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3,3));
   let opened = new cv.Mat();
   cv.morphologyEx(bin, opened, cv.MORPH_OPEN, kernel);
@@ -172,16 +178,9 @@ function recognizeSYS_DIA_FromCanvas(canvas) {
 
   const confidence = Math.min(sys.conf, dia.conf);
 
-  // cleanup
   src.delete(); gray.delete(); blur.delete(); bin.delete(); kernel.delete(); opened.delete();
 
-  return {
-    sys: sys.val,
-    dia: dia.val,
-    confidence,
-    sys_conf: sys.conf,
-    dia_conf: dia.conf,
-  };
+  return { sys: sys.val, dia: dia.val, confidence };
 }
 
 function findDigitBoxes(binMat) {
@@ -197,9 +196,9 @@ function findDigitBoxes(binMat) {
     const c = contours.get(i);
     const r = cv.boundingRect(c);
     const area = r.width * r.height;
+
     if (area < minArea) { c.delete(); continue; }
     if (r.height < 15 || r.width < 8) { c.delete(); continue; }
-
     const ar = r.width / r.height;
     if (ar < 0.15 || ar > 1.2) { c.delete(); continue; }
 
@@ -235,16 +234,12 @@ function readRow(binMat, boxes) {
     confs.push(out.conf);
   }
   if (!digits.length) return { val: null, conf: 0.0 };
-  const val = parseInt(digits.join(""), 10);
-  const conf = confs.reduce((a,b)=>a+b,0) / confs.length;
-  return { val, conf };
+  return { val: parseInt(digits.join(""), 10), conf: avg(confs) };
 }
 
 function readOneDigit(binMat, box, segOnThresh) {
-  const roiRect = new cv.Rect(box.x, box.y, box.w, box.h);
-  const roi = binMat.roi(roiRect);
+  const roi = binMat.roi(new cv.Rect(box.x, box.y, box.w, box.h));
 
-  // 七段相對區域（比例切割）
   const segs = [
     {x0:0.20,y0:0.02,x1:0.80,y1:0.18}, // a
     {x0:0.78,y0:0.15,x1:0.98,y1:0.50}, // b
@@ -263,11 +258,10 @@ function readOneDigit(binMat, box, segOnThresh) {
     const y = Math.floor(s.y0 * roi.rows);
     const w = Math.max(1, Math.floor((s.x1 - s.x0) * roi.cols));
     const h = Math.max(1, Math.floor((s.y1 - s.y0) * roi.rows));
-    const r = new cv.Rect(x, y, Math.min(w, roi.cols - x), Math.min(h, roi.rows - y));
-    const sub = roi.roi(r);
+    const rect = new cv.Rect(x, y, Math.min(w, roi.cols - x), Math.min(h, roi.rows - y));
+    const sub = roi.roi(rect);
 
-    const nz = cv.countNonZero(sub);
-    const ratio = nz / (sub.rows * sub.cols);
+    const ratio = cv.countNonZero(sub) / (sub.rows * sub.cols);
     strengths.push(ratio);
     on.push(ratio > segOnThresh ? 1 : 0);
 
@@ -276,13 +270,8 @@ function readOneDigit(binMat, box, segOnThresh) {
 
   const key = on.join("");
   const digit = SEG_MAP.has(key) ? SEG_MAP.get(key) : null;
-
-  // 簡單信心值：段亮比例離 0.5 越遠通常越穩（0~1）
   const conf = clamp(avg(strengths.map(v => Math.abs(v - 0.5))) * 2.0, 0, 1);
 
   roi.delete();
   return { digit, conf, key };
 }
-
-function avg(arr){ return arr.reduce((a,b)=>a+b,0)/arr.length; }
-function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
