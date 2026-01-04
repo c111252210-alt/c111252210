@@ -144,45 +144,44 @@
         </div>
     </div>
 <!-- 分頁內容：血壓偵測 -->
-    <div id="bloodPressure" class="tab-content">
-        <h2>血壓偵測</h2>
-        <p class="bp-small">
-            說明：上傳血壓計照片（建議先裁切到螢幕、避免反光）→ 呼叫 Hugging Face Space 的 PaliGemma API →
-            取得 SYS / DIA / PUL → 再用你輸入的線性趨勢係數判斷是否脫模。
-        </p>
+<div id="bloodPressure" class="tab-content">
+  <h2>血壓偵測</h2>
+  <p class="bp-small">
+    說明：上傳血壓計照片（建議先裁切到螢幕、避免反光）→ 呼叫 Hugging Face Space 的 PaliGemma API →
+    取得 SYS / DIA / PUL → 再用你輸入的線性趨勢係數判斷是否脫模。
+  </p>
 
-        <div class="bp-card">
-            <div class="bp-row">
-                <input id="bpFile" class="bp-input" type="file" accept="image/*">
-                <button id="bpRecognizeBtn" class="bp-btn" disabled>辨識</button>
-                <span id="bpStatus" class="bp-small">載入中…</span>
-            </div>
-        </div>
-
-        <div class="bp-card">
-            <div>預覽：</div>
-            <img id="bpPreview" class="bp-img" alt="">
-        </div>
-
-        <div class="bp-card">
-            <div class="bp-kpi">辨識結果</div>
-            <div id="bpResult">尚未辨識</div>
-        </div>
-
-        <div id="bpTrend" style="margin-top:10px;"></div>
-        <button id="bpExportBtn" type="button">匯出 bp_data（JSON）</button>
-
-            <div class="bp-small">※ 僅供專題展示參考，不能替代醫療建議</div>
-        </div>
-
-        <div class="bp-card">
-            <div class="bp-kpi">歷史紀錄（localStorage）</div>
-            <div class="bp-row">
-                <button id="bpClearBtn" class="bp-btn">清空紀錄</button>
-                <span class="bp-small">（只會清你這個瀏覽器的紀錄）</span>
-                <div id="bpHistory" style="margin-top:8px;"></div>
-            </div>
+  <div class="bp-card">
+    <div class="bp-row">
+      <input id="bpFile" class="bp-input" type="file" accept="image/*">
+      <button id="bpRecognizeBtn" class="bp-btn" disabled>辨識</button>
+      <span id="bpStatus" class="bp-small">載入中…</span>
     </div>
+  </div>
+
+  <div class="bp-card">
+    <div>預覽：</div>
+    <img id="bpPreview" class="bp-img" alt="">
+  </div>
+
+  <div class="bp-card">
+    <div class="bp-kpi">辨識結果</div>
+    <div id="bpResult">尚未辨識</div>
+  </div>
+
+  <div id="bpTrend" style="margin-top:10px;"></div>
+  <button id="bpExportBtn" type="button">匯出 bp_data（JSON）</button>
+  <div class="bp-small">※ 僅供專題展示參考，不能替代醫療建議</div>
+
+  <!-- 歷史紀錄卡片：確保放在 bloodPressure 分頁內 -->
+  <div class="bp-card" style="margin-top:12px;">
+    <div class="bp-kpi">歷史紀錄（localStorage）</div>
+    <div class="bp-row">
+      <button id="bpClearBtn" class="bp-btn">清空紀錄</button>
+      <span class="bp-small">（只會清你這個瀏覽器的紀錄）</span>
+    </div>
+    <div id="bpHistory" style="margin-top:8px;"></div>
+  </div>
 </div>
 
 <footer>
@@ -190,13 +189,19 @@
 </footer>
 
 <script>
-    function showTab(tabName) {
-        const tabs = document.querySelectorAll('.tab-content');
-        tabs.forEach(tab => tab.classList.remove('active'));
+  function showTab(tabName) {
+    const tabs = document.querySelectorAll('.tab-content');
+    tabs.forEach(tab => tab.classList.remove('active'));
 
-        const activeTab = document.getElementById(tabName);
-        activeTab.classList.add('active');
+    const activeTab = document.getElementById(tabName);
+    activeTab.classList.add('active');
+
+    // 🔹 新增：切到遠端監控就設定串流（避免只在 DOMContentLoaded 設一次）
+    if (tabName === 'monitoring') {
+      const img = document.getElementById('camStream');
+      if (img && !img.src) img.src = CAM_BASE + '/stream';
     }
+  }
 </script>
 
 <!-- 血壓偵測主程式 -->
