@@ -275,3 +275,77 @@ function readOneDigit(binMat, box, segOnThresh) {
   roi.delete();
   return { digit, conf, key };
 }
+const API_BASE = "https://smile950123-bp-paligemma-api.hf.space";
+
+function $(id){ return document.getElementById(id); }
+
+async function recognizeByAPI(file) {
+  const fd = new FormData();
+  fd.append("file", file);
+
+  const res = await fetch(`${API_BASE}/recognize`, {
+    method: "POST",
+    body: fd
+  });
+
+  // 後端若回 500，這裡也能顯示
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}: ${JSON.stringify(data)}`);
+  }
+  return data;
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  // 你的血壓分頁 id（照你之前的 index.html）
+  const fileEl = $("bpFile");
+  const previewEl = $("bpPreview");
+  const btn = $("bpRecognizeBtn");
+  const statusEl = $("bpStatus");
+  const resultEl = $("bpResult");
+
+  if (!fileEl || !btn || !previewEl || !resultEl) return;
+
+  // 現在不需要等 OpenCV.js 了，直接開按鈕
+  btn.disabled = false;
+  if (statusEl) statusEl.textContent = "就緒 ✅（使用 PaliGemma API）";
+
+  fileEl.addEventListener("change", () => {
+    const f = fileEl.files?.[0];
+    if (!f) return;
+    previewEl.src = URL.createObjectURL(f);
+    resultEl.textContent = "已選擇圖片，按「辨識」";
+  });
+
+  btn.addEventListener("click", async () => {
+    const f = fileEl.files?.[0];
+    if (!f) { alert("請先選擇圖片"); return; }
+
+    btn.disabled = true;
+    if (statusEl) statusEl.textContent = "辨識中…";
+
+    try {
+      const j = await recognizeByAPI(f);
+
+      if (!j.ok) {
+        resultEl.innerHTML =
+          `<span style="color:#b00020;font-weight:bold">辨識失敗</span><br>` +
+          `error: ${j.error || ""}<br>` +
+          `raw: ${JSON.stringify(j.raw || j, null, 2)}`;
+      } else {
+        resultEl.innerHTML =
+          `SYS: <b>${j.sys}</b> / DIA: <b>${j.dia}</b> / PUL: <b>${j.pul}</b>`;
+      }
+
+      if (statusEl) statusEl.textContent = "就緒 ✅";
+    } catch (e) {
+      console.error(e);
+      resultEl.innerHTML =
+        `<span style="color:#b00020;font-weight:bold">呼叫 API 失敗</span><br>${String(e)}`;
+      if (statusEl) statusEl.textContent = "就緒";
+    } finally {
+      btn.disabled = false;
+    }
+  });
+});
+
