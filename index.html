@@ -23,27 +23,17 @@
             padding: 20px;
             background-color: white;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            /* footer fixed 會蓋到內容，這裡多留底部空間 */
+            padding-bottom: 70px;
         }
-        h1 {
-            color: #333;
-        }
+        h1 { color: #333; }
         p {
             line-height: 1.6;
             color: #555;
         }
-        .social-links {
-            list-style-type: none;
-            padding: 0;
-        }
-        .social-links li {
-            display: inline-block;
-            margin-right: 10px;
-        }
-        .social-links a {
-            text-decoration: none;
-            color: #4CAF50;
-            font-size: 18px;
-        }
+        .social-links { list-style-type: none; padding: 0; }
+        .social-links li { display: inline-block; margin-right: 10px; }
+        .social-links a { text-decoration: none; color: #4CAF50; font-size: 18px; }
         footer {
             background-color: #333;
             color: white;
@@ -66,37 +56,28 @@
             cursor: pointer;
             font-size: 16px;
         }
-        .tabs button:hover {
-            background-color: #45a049;
-        }
-        .tab-content {
-            display: none;
-        }
-        .active {
-            display: block;
-        }
+        .tabs button:hover { background-color: #45a049; }
+        .tab-content { display: none; }
+        .active { display: block; }
 
         /* ===== 血壓偵測頁：少量補充樣式（不影響其他頁） ===== */
         .bp-card {
             border: 1px solid #eee;
-            border-radius: 12px;
+            border-radius: 10px;
             padding: 12px;
             margin: 12px 0;
             background: #fafafa;
         }
         .bp-row {
             display: flex;
-            gap: 10px;
-            align-items: center;
+            gap: 12px;
             flex-wrap: wrap;
+            align-items: center;
         }
         .bp-kpi {
+            font-size: 20px;
             font-weight: bold;
-            margin-bottom: 6px;
-        }
-        .bp-small {
-            font-size: 12px;
-            color: #666;
+            color: #222;
         }
         .bp-img {
             max-width: 100%;
@@ -110,12 +91,11 @@
             border: none;
             background: #4CAF50;
             color: #fff;
-            border-radius: 6px;
         }
         .bp-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .bp-small { color: #666; font-size: 12px; }
     </style>
 </head>
-
 <body>
 
 <header>
@@ -144,19 +124,43 @@
 
     <!-- 分頁內容：遠端監控 -->
     <div id="monitoring" class="tab-content">
-        <h2>遠端監控</h2>
-        <p>這裡未來會新增遠端監控的相關成果。</p>
+  <h2>遠端監控（ESP32-CAM）</h2>
+
+  <div class="bp-card">
+    <div class="bp-row">
+      <label>ESP32-CAM 位址：</label>
+      <input id="camIp" class="bp-input" placeholder="例如 http://192.168.1.87 或 /cam" style="min-width:260px" />
+      <button id="camConnect" class="bp-btn">連線</button>
+      <span id="camStatus" class="bp-small" style="color:#4CAF50;">未連線</span>
     </div>
+  </div>
+
+  <div class="bp-card">
+    <img id="camStream" alt="stream" style="width:100%;max-width:960px;border-radius:10px;background:#000;" />
+  </div>
+
+  <div class="bp-card">
+    <div class="bp-row">
+      <button id="camSnap"  class="bp-btn" style="background:#2e6df6;">📸 Snapshot</button>
+      <button id="camLed"   class="bp-btn" style="background:#444;">💡 LED</button>
+      <button id="camClear" class="bp-btn" style="background:#444;">清除警報</button>
+      <span id="camAlarm" class="bp-small" style="margin-left:8px;color:#9be26d;">System Normal</span>
+    </div>
+  </div>
+
+  <p class="bp-small">
+    提示：若你的網站是 HTTPS、相機是 HTTP，瀏覽器會擋「混合內容」。可先在同區網用 HTTP 測試，或於伺服器做反向代理（把板子 IP 代理成 /cam）。
+  </p>
+</div>
 
     <!-- 分頁內容：血壓偵測 -->
     <div id="bloodPressure" class="tab-content">
         <h2>血壓偵測</h2>
         <p class="bp-small">
-            說明：上傳血壓計照片（建議先裁切到螢幕、避免反光）→ 呼叫 Hugging Face Space API →
-            取得 SYS / DIA / PUL → 依據網站內 bp_data.json（基準）+ localStorage（新增）做趨勢判斷並可匯出合併 JSON。
+            說明：上傳血壓計照片（建議先裁切到螢幕、避免反光）→ 呼叫 Hugging Face Space 的 PaliGemma API →
+            取得 SYS / DIA / PUL → 再用你輸入的線性趨勢係數判斷是否脫模。
         </p>
 
-        <!-- 上傳 + 辨識 -->
         <div class="bp-card">
             <div class="bp-row">
                 <input id="bpFile" class="bp-input" type="file" accept="image/*">
@@ -165,42 +169,35 @@
             </div>
         </div>
 
-        <!-- 預覽 -->
         <div class="bp-card">
-            <div class="bp-kpi">預覽</div>
+            <div>預覽：</div>
             <img id="bpPreview" class="bp-img" alt="">
         </div>
 
-        <!-- 辨識結果 -->
         <div class="bp-card">
             <div class="bp-kpi">辨識結果</div>
             <div id="bpResult">尚未辨識</div>
         </div>
 
-        <!-- 趨勢判斷 + 匯出 -->
-        <div class="bp-card">
-            <div class="bp-kpi">趨勢判斷</div>
-            <div id="bpTrend" style="margin-top:10px;"></div>
+        <div id="bpTrend" style="margin-top:10px;"></div>
+        <button id="bpExportBtn" type="button">匯出 bp_data（JSON）</button>
 
-            <div class="bp-row" style="margin-top:10px;">
-                <button id="bpExportBtn" type="button" class="bp-btn">匯出 bp_data（JSON）</button>
-                <span class="bp-small">※ 僅供專題展示參考，不能替代醫療建議</span>
-            </div>
+            <div class="bp-small">※ 僅供專題展示參考，不能替代醫療建議</div>
         </div>
 
-        <!-- 歷史紀錄（只在血壓分頁出現） -->
         <div class="bp-card">
             <div class="bp-kpi">歷史紀錄（localStorage）</div>
             <div class="bp-row">
                 <button id="bpClearBtn" class="bp-btn">清空紀錄</button>
                 <span class="bp-small">（只會清你這個瀏覽器的紀錄）</span>
+                <div id="bpHistory" style="margin-top:8px;"></div>
             </div>
-            <div id="bpHistory" style="margin-top:8px;"></div>
-        </div>
     </div>
 </div>
 
-
+<footer>
+    <p>© 2025 胡智強. All Rights Reserved.</p>
+</footer>
 
 <script>
     function showTab(tabName) {
@@ -210,6 +207,83 @@
         const activeTab = document.getElementById(tabName);
         activeTab.classList.add('active');
     }
+</script>
+
+<script>
+  // ===== 遠端監控（ESP32-CAM）整合 =====
+  (function(){
+    const ipInput = document.getElementById('camIp');
+    const stream  = document.getElementById('camStream');
+    const statusEl= document.getElementById('camStatus');
+    const alarmEl = document.getElementById('camAlarm');
+    const btnConn = document.getElementById('camConnect');
+    const btnSnap = document.getElementById('camSnap');
+    const btnLed  = document.getElementById('camLed');
+    const btnClr  = document.getElementById('camClear');
+
+    if(!ipInput) return;
+
+    const ok  = (msg)=>{ statusEl.textContent = msg||'OK'; statusEl.style.color = '#4CAF50'; }
+    const bad = (msg)=>{ statusEl.textContent = msg||'錯誤'; statusEl.style.color = '#ff6565'; }
+
+    let CAM_BASE = localStorage.getItem('cam_base') || 'http://192.168.1.87';
+    let ledOn = false, pollTimer = null;
+
+    function setBase(url){
+      CAM_BASE = (url||'').trim().replace(/\/+$/,'');
+      if(!/^https?:\/\//.test(CAM_BASE) && !CAM_BASE.startsWith('/')) CAM_BASE = 'http://' + CAM_BASE;
+      localStorage.setItem('cam_base', CAM_BASE);
+      ipInput.value = CAM_BASE;
+      stream.src = CAM_BASE + '/stream';
+      ok('連線中…');
+      if (pollTimer) clearTimeout(pollTimer);
+      poll();
+    }
+
+    async function poll(){
+      try{
+        const r = await fetch(CAM_BASE + '/status', { mode:'cors' });
+        const j = await r.json();
+        alarmEl.textContent = j.alarm ? '⚠ ALARM TRIGGERED' : 'System Normal';
+        alarmEl.style.color = j.alarm ? '#ff6565' : '#9be26d';
+        ok('連線中');
+      }catch(e){
+        bad('無法取得狀態'); 
+      }finally{
+        pollTimer = setTimeout(poll, 1500);
+      }
+    }
+
+    btnConn?.addEventListener('click', ()=> setBase(ipInput.value || CAM_BASE));
+
+    btnSnap?.addEventListener('click', async ()=>{
+      try{
+        const r = await fetch(CAM_BASE + '/snapshot');
+        if(!r.ok) throw new Error('snapshot failed');
+        const b = await r.blob();
+        const url = URL.createObjectURL(b);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'snapshot.jpg'; a.click();
+        URL.revokeObjectURL(url);
+      }catch(e){ bad('snapshot 失敗'); }
+    });
+
+    btnLed?.addEventListener('click', async ()=>{
+      try{
+        ledOn = !ledOn;
+        await fetch(CAM_BASE + '/led?on=' + (ledOn?1:0));
+        btnLed.textContent = ledOn ? '💡 LED (ON)' : '💡 LED';
+      }catch(e){ bad('LED 失敗'); }
+    });
+
+    btnClr?.addEventListener('click', async ()=>{ try{ await fetch(CAM_BASE + '/reset_alarm'); }catch(e){} });
+
+    stream.onerror = ()=> setTimeout(()=>{ stream.src = CAM_BASE + '/stream'; }, 3000);
+
+    // 初次載入就自動接前次設定
+    ipInput.value = CAM_BASE;
+    setBase(CAM_BASE);
+  })();
 </script>
 
 <!-- 血壓偵測主程式 -->
