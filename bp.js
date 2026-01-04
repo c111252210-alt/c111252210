@@ -1,4 +1,3 @@
-// bp.js (FULL REPLACE) — POST /recognize (multipart/form-data)
 
 const LS_KEY = "bp_history_v1";
 let history = JSON.parse(localStorage.getItem(LS_KEY) || "[]");
@@ -38,47 +37,14 @@ function judgeOne(y, a, b, t, thr) {
   return { yhat, err, out: Math.abs(err) > thr };
 }
 
-// ✅ 壓縮圖片成 JPEG File（減少檔案大小，避免代理/平台擋）
-async function compressImage(file, maxSize = 1024, quality = 0.85) {
-  const img = new Image();
-  const url = URL.createObjectURL(file);
-  img.src = url;
-
-  await new Promise((resolve, reject) => {
-    img.onload = resolve;
-    img.onerror = reject;
-  });
-
-  let { width, height } = img;
-  const scale = Math.min(1, maxSize / Math.max(width, height));
-  width = Math.max(1, Math.round(width * scale));
-  height = Math.max(1, Math.round(height * scale));
-
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(img, 0, 0, width, height);
-
-  URL.revokeObjectURL(url);
-
-  const blob = await new Promise((resolve) =>
-    canvas.toBlob(resolve, "image/jpeg", quality)
-  );
-
-  return new File([blob], "bp.jpg", { type: "image/jpeg" });
-}
-
 async function recognizeByAPI(file) {
   const base = API_BASE.replace(/\/+$/, "");
-  const url = `${base}/recognize`; // ✅ only /recognize
+  const url = `${base}/recognize`;
   console.log("[BP] POST ->", url);
-
-  // 壓縮後再傳
-  const smallFile = await compressImage(file, 1024, 0.85);
+  console.log("[BP] original file:", file.type, file.size, file.name);
 
   const fd = new FormData();
-  fd.append("file", smallFile);
+  fd.append("file", file); // ✅ 原圖直接送
 
   const res = await fetch(url, {
     method: "POST",
@@ -115,7 +81,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   recognizeBtn.disabled = false;
 
-  // health check（可看 Space 是否可被匿名存取）
+  // health check
   if (statusEl) statusEl.textContent = "檢查後端連線中…";
   try {
     const base = API_BASE.replace(/\/+$/, "");
@@ -124,8 +90,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     const j = await r.json();
     if (statusEl) statusEl.textContent = `後端OK ✅ (${j.device}, ${j.model})`;
   } catch (e) {
-    if (statusEl) statusEl.textContent =
-      `後端連線失敗（Space 若為 Private 會被擋）：${String(e)}`;
+    if (statusEl) statusEl.textContent = `後端連線失敗：${String(e)}`;
   }
 
   fileEl.addEventListener("change", () => {
@@ -176,19 +141,24 @@ window.addEventListener("DOMContentLoaded", async () => {
       history.push({ t: history.length, sys: j.sys, dia: j.dia, pul: j.pul, ts: Date.now() });
       saveHistory();
 
-      if (judgeBtn) judgeBtn.disabled = false;
+      if (judgeBtn) showJudgeButtonState(true);
       if (statusEl) statusEl.textContent = "就緒 ✅";
     } catch (e) {
       console.error(e);
       resultEl.innerHTML =
         `<span style="color:#b00020;font-weight:bold">呼叫 API 失敗</span><br>` +
         `<span class="bp-small">${String(e)}</span>`;
-      if (judgeBtn) judgeBtn.disabled = true;
+      if (judgeBtn) showJudgeButtonState(false);
       if (statusEl) statusEl.textContent = "就緒";
     } finally {
       recognizeBtn.disabled = false;
     }
   });
+
+  function showJudgeButtonState(enabled) {
+    if (!judgeBtn) return;
+    judgeBtn.disabled = !enabled;
+  }
 
   if (judgeBtn) {
     judgeBtn.addEventListener("click", () => {
