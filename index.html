@@ -122,13 +122,28 @@
         </ul>
     </div>
 
+    
     <!-- 分頁內容：遠端監控 -->
     <div id="monitoring" class="tab-content">
         <h2>遠端監控</h2>
-        
-    </div>
 
-    <!-- 分頁內容：血壓偵測 -->
+        <div class="bp-card">
+            <div class="bp-kpi">ESP32-CAM 直播串流</div>
+            <div style="text-align:center">
+                <img id="camStream" alt="ESP32-CAM Stream" style="max-width:100%;border-radius:8px;"/>
+            </div>
+            <div class="bp-small" id="camInfo" style="margin-top:6px;opacity:.7"></div>
+        </div>
+
+        <div class="bp-card">
+            <div class="bp-row">
+                <button class="bp-btn" onclick="doSnapshot()">📸 下載截圖</button>
+                <button id="ledOn"  class="bp-btn" onclick="toggleLed(true)">💡 LED 開</button>
+                <button id="ledOff" class="bp-btn" onclick="toggleLed(false)">💡 LED 關</button>
+            </div>
+        </div>
+    </div>
+<!-- 分頁內容：血壓偵測 -->
     <div id="bloodPressure" class="tab-content">
         <h2>血壓偵測</h2>
         <p class="bp-small">
@@ -189,17 +204,34 @@
 
 
 <script>
+// 固定公開網址（已透過 Cloudflare Tunnel）
+const CAM_BASE = 'https://cam.111252210.xyz';
+
 document.addEventListener('DOMContentLoaded', () => {
-  // set stream src immediately
   const img = document.getElementById('camStream');
   if (img) img.src = CAM_BASE + '/stream';
-  // remove the old connect bar if it exists
-  const candidates = Array.from(document.querySelectorAll('div,section,form,header,footer'));
-  for (const el of candidates) {
-    const t = (el.textContent||'').trim();
-    if (t.includes('ESP32-CAM 位址')) { el.remove(); break; }
-  }
+  const info = document.getElementById('camInfo');
+  if (info) info.textContent = CAM_BASE + ' /stream';
 });
+
+async function doSnapshot(){
+  try {
+    const r = await fetch(CAM_BASE + '/snapshot', { mode:'cors' });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    const b = await r.blob();
+    const url = URL.createObjectURL(b);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'snapshot.jpg'; a.click();
+    URL.revokeObjectURL(url);
+  } catch(e){
+    alert('截圖失敗：' + e.message);
+  }
+}
+
+async function toggleLed(on){
+  try { await fetch(CAM_BASE + '/led?on=' + (on?1:0), { mode:'cors' }); }
+  catch(e){ alert('LED 失敗：' + e.message); }
+}
 </script>
 
 </body>
