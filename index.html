@@ -124,34 +124,9 @@
 
     <!-- 分頁內容：遠端監控 -->
     <div id="monitoring" class="tab-content">
-  <h2>遠端監控（ESP32-CAM）</h2>
-
-  <div class="bp-card">
-    <div class="bp-row">
-      <label>ESP32-CAM 位址：</label>
-      <input id="camIp" class="bp-input" placeholder="例如 https://cam.111252210.xyz" style="min-width:260px" />
-      <button id="camConnect" class="bp-btn">連線</button>
-      <span id="camStatus" class="bp-small" style="color:#4CAF50;">未連線</span>
+        <h2>遠端監控</h2>
+        <p>這裡未來會新增遠端監控的相關成果。</p>
     </div>
-  </div>
-
-  <div class="bp-card">
-    <img id="camStream" alt="stream" style="width:100%;max-width:960px;border-radius:10px;background:#000;" />
-  </div>
-
-  <div class="bp-card">
-    <div class="bp-row">
-      <button id="camSnap"  class="bp-btn" style="background:#2e6df6;">📸 Snapshot</button>
-      <button id="camLed"   class="bp-btn" style="background:#444;">💡 LED</button>
-      <button id="camClear" class="bp-btn" style="background:#444;">清除警報</button>
-      <span id="camAlarm" class="bp-small" style="margin-left:8px;color:#9be26d;">System Normal</span>
-    </div>
-  </div>
-
-  <p class="bp-small">
-    提示：若你的網站是 HTTPS、相機是 HTTP，瀏覽器會擋「混合內容」。可先在同區網用 HTTP 測試，或於伺服器做反向代理（把板子 IP 代理成 /cam）。
-  </p>
-</div>
 
     <!-- 分頁內容：血壓偵測 -->
     <div id="bloodPressure" class="tab-content">
@@ -185,7 +160,7 @@
             <div class="bp-small">※ 僅供專題展示參考，不能替代醫療建議</div>
         </div>
 
-        <div id="bpHistoryCard" class="bp-card" style="display:none;">
+        <div class="bp-card">
             <div class="bp-kpi">歷史紀錄（localStorage）</div>
             <div class="bp-row">
                 <button id="bpClearBtn" class="bp-btn">清空紀錄</button>
@@ -205,99 +180,27 @@
         tabs.forEach(tab => tab.classList.remove('active'));
 
         const activeTab = document.getElementById(tabName);
-       
-// Hide history card at load if not on bloodPressure
-(function(){
-  const bpHist = document.getElementById('bpHistoryCard');
-  if (bpHist) { bpHist.style.display = document.getElementById('bloodPressure')?.classList.contains('active') ? '' : 'none'; }
-})();
- activeTab.classList.add('active');
-    
-        // Toggle BP history card visibility only on bloodPressure tab
-        const bpHist = document.getElementById('bpHistoryCard');
-        if (bpHist) { bpHist.style.display = (tabName === 'bloodPressure') ? '' : 'none'; }
-}
-</script>
-
-<script>
-  // ===== 遠端監控（ESP32-CAM）整合 =====
-  (function(){
-    const ipInput = document.getElementById('camIp');
-    const stream  = document.getElementById('camStream');
-    const statusEl= document.getElementById('camStatus');
-    const alarmEl = document.getElementById('camAlarm');
-    const btnConn = document.getElementById('camConnect');
-    const btnSnap = document.getElementById('camSnap');
-    const btnLed  = document.getElementById('camLed');
-    const btnClr  = document.getElementById('camClear');
-
-    if(!ipInput) return;
-
-    const ok  = (msg)=>{ statusEl.textContent = msg||'OK'; statusEl.style.color = '#4CAF50'; }
-    const bad = (msg)=>{ statusEl.textContent = msg||'錯誤'; statusEl.style.color = '#ff6565'; }
-
-    let CAM_BASE = localStorage.getItem('cam_base') || 'https://cam.111252210.xyz';
-    let ledOn = false, pollTimer = null;
-
-    function setBase(url){
-      CAM_BASE = (url||'').trim().replace(/\/+$/,'');
-      if(!/^https?:\/\//.test(CAM_BASE) && !CAM_BASE.startsWith('/')) CAM_BASE = 'http://' + CAM_BASE;
-      localStorage.setItem('cam_base', CAM_BASE);
-      ipInput.value = CAM_BASE;
-      stream.src = CAM_BASE + '/stream';
-      ok('連線中…');
-      if (pollTimer) clearTimeout(pollTimer);
-      poll();
+        activeTab.classList.add('active');
     }
-
-    async function poll(){
-      try{
-        const r = await fetch(CAM_BASE + '/status', { mode:'cors' });
-        const j = await r.json();
-        alarmEl.textContent = j.alarm ? '⚠ ALARM TRIGGERED' : 'System Normal';
-        alarmEl.style.color = j.alarm ? '#ff6565' : '#9be26d';
-        ok('連線中');
-      }catch(e){
-        bad('無法取得狀態'); 
-      }finally{
-        pollTimer = setTimeout(poll, 1500);
-      }
-    }
-
-    btnConn?.addEventListener('click', ()=> setBase(ipInput.value || CAM_BASE));
-
-    btnSnap?.addEventListener('click', async ()=>{
-      try{
-        const r = await fetch(CAM_BASE + '/snapshot');
-        if(!r.ok) throw new Error('snapshot failed');
-        const b = await r.blob();
-        const url = URL.createObjectURL(b);
-        const a = document.createElement('a');
-        a.href = url; a.download = 'snapshot.jpg'; a.click();
-        URL.revokeObjectURL(url);
-      }catch(e){ bad('snapshot 失敗'); }
-    });
-
-    btnLed?.addEventListener('click', async ()=>{
-      try{
-        ledOn = !ledOn;
-        await fetch(CAM_BASE + '/led?on=' + (ledOn?1:0));
-        btnLed.textContent = ledOn ? '💡 LED (ON)' : '💡 LED';
-      }catch(e){ bad('LED 失敗'); }
-    });
-
-    btnClr?.addEventListener('click', async ()=>{ try{ await fetch(CAM_BASE + '/reset_alarm'); }catch(e){} });
-
-    stream.onerror = ()=> setTimeout(()=>{ stream.src = CAM_BASE + '/stream'; }, 3000);
-
-    // 初次載入就自動接前次設定
-    ipInput.value = CAM_BASE;
-    setBase(CAM_BASE);
-  })();
 </script>
 
 <!-- 血壓偵測主程式 -->
 <script src="./bp.js?v=20260104"></script>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // set stream src immediately
+  const img = document.getElementById('camStream');
+  if (img) img.src = CAM_BASE + '/stream';
+  // remove the old connect bar if it exists
+  const candidates = Array.from(document.querySelectorAll('div,section,form,header,footer'));
+  for (const el of candidates) {
+    const t = (el.textContent||'').trim();
+    if (t.includes('ESP32-CAM 位址')) { el.remove(); break; }
+  }
+});
+</script>
 
 </body>
 </html>
