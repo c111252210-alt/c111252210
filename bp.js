@@ -1,32 +1,60 @@
+// bp.js (FULL REPLACE)
+
 const LS_KEY = "bp_history_v1";
 let history = JSON.parse(localStorage.getItem(LS_KEY) || "[]");
 
+// ✅ 你的 Hugging Face Space
 const API_BASE = "https://smile950123-bp-paligemma-api.hf.space";
 
-function $(id){ return document.getElementById(id); }
-function avg(arr){ return arr.reduce((a,b)=>a+b,0)/Math.max(1,arr.length); }
+function $(id) { return document.getElementById(id); }
 
-let last = { sys:null, dia:null, pul:null };
+let last = { sys: null, dia: null, pul: null };
 
-function renderHistory(){
+function renderHistory() {
   const el = $("bpHistory");
   if (!el) return;
-  if (!history.length) { el.innerHTML = "<small>尚無資料</small>"; return; }
+
+  if (!history.length) {
+    el.innerHTML = "<small>尚無資料</small>";
+    return;
+  }
 
   el.innerHTML = history.map(h =>
-    `<div><b>t=${h.t}</b> SYS=${h.sys} / DIA=${h.dia} / PUL=${h.pul ?? "-"} <small>(${new Date(h.ts).toLocaleString()})</small></div>`
+    `<div>
+      <b>t=${h.t}</b>
+      SYS=${h.sys} / DIA=${h.dia} / PUL=${h.pul ?? "-"}
+      <small>(${new Date(h.ts).toLocaleString()})</small>
+    </div>`
   ).join("");
 }
-function saveHistory(){
+
+function saveHistory() {
   localStorage.setItem(LS_KEY, JSON.stringify(history));
   renderHistory();
 }
-renderHistory();
 
-async function compressImage(file, maxSize = 1024, quality = 0.85) {
+function judgeOne(y, a, b, t, thr) {
+  const yhat = a * t + b;
+  const err = y - yhat;
+  return { yhat, err, out: Math.abs(err) > thr };
+}
+
+// ====== 影像轉 dataURL（base64） ======
+async function fileToDataURL(file) {
+  return await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+// （可選，但建議）先縮圖再轉 base64，避免太大、加速上傳與推論
+async function compressToDataURL(file, maxSize = 1024, quality = 0.85) {
   const img = new Image();
   const url = URL.createObjectURL(file);
   img.src = url;
+
   await new Promise((resolve, reject) => {
     img.onload = resolve;
     img.onerror = reject;
@@ -34,14 +62,14 @@ async function compressImage(file, maxSize = 1024, quality = 0.85) {
 
   let { width, height } = img;
   const scale = Math.min(1, maxSize / Math.max(width, height));
-  width = Math.round(width * scale);
-  height = Math.round(height * scale);
+  const w = Math.max(1, Math.round(width * scale));
+  const h = Math.max(1, Math.round(height * scale));
 
   const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = w;
+  canvas.height = h;
   const ctx = canvas.getContext("2d");
-  ctx.drawImage(img, 0, 0, width, height);
+  ctx.drawImage(img, 0, 0, w, h);
 
   URL.revokeObjectURL(url);
 
@@ -49,43 +77,45 @@ async function compressImage(file, maxSize = 1024, quality = 0.85) {
     canvas.toBlob(resolve, "image/jpeg", quality)
   );
 
-  // 轉成一個新 File（方便保留檔名）
-  return new File([blob], "bp.jpg", { type: "image/jpeg" });
+  // blob -> dataURL
+  return await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
 }
 
+// ====== 呼叫後端：改用 /recognize_b64 (JSON) ======
 async function recognizeByAPI(file) {
   const base = API_BASE.replace(/\/+$/, "");
-  const url = `${base}/recognize`;
+  const url = `${base}/recognize_b64`; // ✅ 走 JSON base64，避免跨站 multipart 被擋
   console.log("[BP] POST ->", url);
 
-  // ✅ 關鍵：先縮圖壓縮
-  const smallFile = await compressImage(file, 1024, 0.85);
-
-  const fd = new FormData();
-  fd.append("file", smallFile);
+  // 建議用壓縮版本
+  const dataURL = await compressToDataURL(file, 1024, 0.85);
 
   const res = await fetch(url, {
-  method: "POST",
-  body: fd,
-  mode: "cors",
-  credentials: "omit", // ✅ 不帶 cookie，降低被平台誤判風險
-  cache: "no-store"
-});
-  const text = await res.text();
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    mode: "cors",
+    credentials: "omit",
+    cache: "no-store",
+    body: JSON.stringify({ image_b64: dataURL }),
+  });
 
+  const text = await res.text();
   let data = null;
   try { data = JSON.parse(text); } catch {}
 
   if (!res.ok) {
-    throw new Error(`HTTP ${res.status} at ${url}: ${text.slice(0,200)}`);
+    throw new Error(`HTTP ${res.status} at ${url}: ${text.slice(0, 250)}`);
   }
   return data ?? { ok: false, error: "Non-JSON response", raw: text };
 }
 
-
-
-// ===== UI 綁定 =====
-window.addEventListener("DOMContentLoaded", () => {
+// ====== UI 綁定 ======
+window.addEventListener("DOMContentLoaded", async () => {
   const fileEl = $("bpFile");
   const previewEl = $("bpPreview");
   const statusEl = $("bpStatus");
@@ -96,11 +126,23 @@ window.addEventListener("DOMContentLoaded", () => {
   const judgeBtn = $("bpJudgeBtn");
   const clearBtn = $("bpClearBtn");
 
+  renderHistory();
+
   if (!fileEl || !previewEl || !resultEl || !recognizeBtn) return;
 
-  // API 版：不需要 OpenCV.js，直接可用
+  // 讓按鈕一開始就可按（不依賴 OpenCV.js）
   recognizeBtn.disabled = false;
-  if (statusEl) statusEl.textContent = "就緒 ✅（使用 PaliGemma API）";
+
+  // 啟動時先測 /health（可快速確認 API_BASE）
+  if (statusEl) statusEl.textContent = "檢查後端連線中…";
+  try {
+    const base = API_BASE.replace(/\/+$/, "");
+    const r = await fetch(`${base}/health`, { cache: "no-store" });
+    const j = await r.json();
+    if (statusEl) statusEl.textContent = `後端OK ✅ (${j.device}, ${j.model})`;
+  } catch (e) {
+    if (statusEl) statusEl.textContent = `後端連線失敗：${String(e)}`;
+  }
 
   fileEl.addEventListener("change", () => {
     const f = fileEl.files?.[0];
@@ -114,9 +156,9 @@ window.addEventListener("DOMContentLoaded", () => {
     clearBtn.addEventListener("click", () => {
       history = [];
       saveHistory();
-      last = { sys:null, dia:null, pul:null };
+      last = { sys: null, dia: null, pul: null };
       if (judgeBtn) judgeBtn.disabled = true;
-      if (resultEl) resultEl.textContent = "已清空紀錄";
+      resultEl.textContent = "已清空紀錄";
       if (judgeOutEl) judgeOutEl.textContent = "";
     });
   }
@@ -169,7 +211,6 @@ window.addEventListener("DOMContentLoaded", () => {
     judgeBtn.addEventListener("click", () => {
       if (last.sys == null || last.dia == null) { alert("請先辨識"); return; }
 
-      // 最近一次 push 進 history 的那筆，就是本次 t
       const t = history.length - 1;
 
       const a_sys = parseFloat($("bp_a_sys").value);
