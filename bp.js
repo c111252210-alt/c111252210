@@ -23,14 +23,46 @@ function saveHistory(){
 }
 renderHistory();
 
+async function compressImage(file, maxSize = 1024, quality = 0.85) {
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.src = url;
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
+    img.onerror = reject;
+  });
+
+  let { width, height } = img;
+  const scale = Math.min(1, maxSize / Math.max(width, height));
+  width = Math.round(width * scale);
+  height = Math.round(height * scale);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, width, height);
+
+  URL.revokeObjectURL(url);
+
+  const blob = await new Promise((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", quality)
+  );
+
+  // 轉成一個新 File（方便保留檔名）
+  return new File([blob], "bp.jpg", { type: "image/jpeg" });
+}
+
 async function recognizeByAPI(file) {
-  const fd = new FormData();
-  fd.append("file", file);
-
   const base = API_BASE.replace(/\/+$/, "");
-  const url = `${base}/recognize`;   // ✅ 只用這個
-
+  const url = `${base}/recognize`;
   console.log("[BP] POST ->", url);
+
+  // ✅ 關鍵：先縮圖壓縮
+  const smallFile = await compressImage(file, 1024, 0.85);
+
+  const fd = new FormData();
+  fd.append("file", smallFile);
 
   const res = await fetch(url, { method: "POST", body: fd });
   const text = await res.text();
@@ -43,6 +75,7 @@ async function recognizeByAPI(file) {
   }
   return data ?? { ok: false, error: "Non-JSON response", raw: text };
 }
+
 
 
 // ===== UI 綁定 =====
