@@ -25,24 +25,35 @@ renderHistory();
 
 async function recognizeByAPI(file) {
   const fd = new FormData();
-  fd.append("file", file);
+   fd.append("file", file);
 
-  const res = await fetch(`${API_BASE}/recognize`, {
-    method: "POST",
-    body: fd
-  });
+  const base = API_BASE.replace(/\/+$/, ""); // 去掉結尾 /
+  const candidates = [`${base}/recognize`, `${base}/recognize/`];
 
-  const data = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status}: ${JSON.stringify(data)}`);
+  let lastErr = null;
+
+  for (const url of candidates) {
+    try {
+      const res = await fetch(url, { method: "POST", body: fd });
+
+      // 404 通常回 HTML，不一定能 json()
+      const text = await res.text();
+      const data = (() => { try { return JSON.parse(text); } catch { return null; } })();
+
+      if (!res.ok) {
+        // 如果是 404 就繼續試下一個 url
+        if (res.status === 404) { lastErr = `HTTP 404 at ${url}`; continue; }
+        throw new Error(`HTTP ${res.status} at ${url}: ${text.slice(0,200)}`);
+      }
+
+      // 成功
+      return data ?? { ok: false, error: "Non-JSON response", raw: text };
+    } catch (e) {
+      lastErr = String(e);
+    }
   }
-  return data;
-}
 
-function judgeOne(y, a, b, t, thr) {
-  const yhat = a * t + b;
-  const err = y - yhat;
-  return { yhat, err, out: Math.abs(err) > thr };
+  throw new Error(lastErr || "Request failed");
 }
 
 // ===== UI 綁定 =====
