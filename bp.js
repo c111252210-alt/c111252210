@@ -25,36 +25,25 @@ renderHistory();
 
 async function recognizeByAPI(file) {
   const fd = new FormData();
-   fd.append("file", file);
+  fd.append("file", file);
 
-  const base = API_BASE.replace(/\/+$/, ""); // 去掉結尾 /
-  const candidates = [`${base}/recognize`, `${base}/recognize/`];
+  const base = API_BASE.replace(/\/+$/, "");
+  const url = `${base}/recognize`;   // ✅ 只用這個
 
-  let lastErr = null;
+  console.log("[BP] POST ->", url);
 
-  for (const url of candidates) {
-    try {
-      const res = await fetch(url, { method: "POST", body: fd });
+  const res = await fetch(url, { method: "POST", body: fd });
+  const text = await res.text();
 
-      // 404 通常回 HTML，不一定能 json()
-      const text = await res.text();
-      const data = (() => { try { return JSON.parse(text); } catch { return null; } })();
+  let data = null;
+  try { data = JSON.parse(text); } catch {}
 
-      if (!res.ok) {
-        // 如果是 404 就繼續試下一個 url
-        if (res.status === 404) { lastErr = `HTTP 404 at ${url}`; continue; }
-        throw new Error(`HTTP ${res.status} at ${url}: ${text.slice(0,200)}`);
-      }
-
-      // 成功
-      return data ?? { ok: false, error: "Non-JSON response", raw: text };
-    } catch (e) {
-      lastErr = String(e);
-    }
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status} at ${url}: ${text.slice(0,200)}`);
   }
-
-  throw new Error(lastErr || "Request failed");
+  return data ?? { ok: false, error: "Non-JSON response", raw: text };
 }
+
 
 // ===== UI 綁定 =====
 window.addEventListener("DOMContentLoaded", () => {
