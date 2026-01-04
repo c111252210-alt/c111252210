@@ -1,221 +1,159 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>胡智強的個人頁面</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f0f0f0;
-        }
-        header {
-            background-color: #4CAF50;
-            color: white;
-            text-align: center;
-            padding: 20px 0;
-        }
-        .container {
-            width: 80%;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: white;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-        }
-        h1 {
-            color: #333;
-        }
-        p {
-            line-height: 1.6;
-            color: #555;
-        }
-        .social-links {
-            list-style-type: none;
-            padding: 0;
-        }
-        .social-links li {
-            display: inline-block;
-            margin-right: 10px;
-        }
-        .social-links a {
-            text-decoration: none;
-            color: #4CAF50;
-            font-size: 18px;
-        }
-        footer {
-            background-color: #333;
-            color: white;
-            text-align: center;
-            padding: 10px 0;
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-        }
-        .tabs {
-            margin: 20px 0;
-            text-align: center;
-        }
-        .tabs button {
-            padding: 10px 20px;
-            margin: 5px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        .tabs button:hover {
-            background-color: #45a049;
-        }
-        .tab-content {
-            display: none;
-        }
-        .active {
-            display: block;
-        }
+const LS_KEY = "bp_history_v1";
+let history = JSON.parse(localStorage.getItem(LS_KEY) || "[]");
 
-        /* ===== 血壓偵測頁：少量補充樣式（不影響其他頁） ===== */
-        .bp-card {
-            border: 1px solid #eee;
-            border-radius: 12px;
-            padding: 12px;
-            margin: 12px 0;
-            background: #fafafa;
-        }
-        .bp-row {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .bp-kpi {
-            font-weight: bold;
-            margin-bottom: 6px;
-        }
-        .bp-small {
-            font-size: 12px;
-            color: #666;
-        }
-        .bp-img {
-            max-width: 100%;
-            border: 1px solid #ddd;
-            border-radius: 10px;
-        }
-        .bp-input { padding: 6px 8px; }
-        .bp-btn {
-            padding: 8px 12px;
-            cursor: pointer;
-            border: none;
-            background: #4CAF50;
-            color: #fff;
-            border-radius: 6px;
-        }
-        .bp-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-    </style>
-</head>
+const API_BASE = "https://smile950123-bp-paligemma-api.hf.space";
 
-<body>
+function $(id){ return document.getElementById(id); }
+function avg(arr){ return arr.reduce((a,b)=>a+b,0)/Math.max(1,arr.length); }
 
-<header>
-    <h1>歡迎來到我的個人頁面</h1>
-</header>
+let last = { sys:null, dia:null, pul:null };
 
-<div class="container">
-    <!-- 按鈕列 -->
-    <div class="tabs">
-        <button onclick="showTab('intro')">自我介紹</button>
-        <button onclick="showTab('monitoring')">遠端監控</button>
-        <button onclick="showTab('bloodPressure')">血壓偵測</button>
-    </div>
+function renderHistory(){
+  const el = $("bpHistory");
+  if (!el) return;
+  if (!history.length) { el.innerHTML = "<small>尚無資料</small>"; return; }
 
-    <!-- 分頁內容：自我介紹 -->
-    <div id="intro" class="tab-content active">
-        <h2>你好，我是胡智強</h2>
-        <p>我是一名學生，來自高雄科技大學電子工程系大四。</p>
+  el.innerHTML = history.map(h =>
+    `<div><b>t=${h.t}</b> SYS=${h.sys} / DIA=${h.dia} / PUL=${h.pul ?? "-"} <small>(${new Date(h.ts).toLocaleString()})</small></div>`
+  ).join("");
+}
+function saveHistory(){
+  localStorage.setItem(LS_KEY, JSON.stringify(history));
+  renderHistory();
+}
+renderHistory();
 
-        <h3>聯絡方式</h3>
-        <p>你可以通過以下方式與我聯繫：</p>
-        <ul class="social-links">
-            <li><a href="mailto:c111252210@nkust.edu.tw">Email</a></li>
-        </ul>
-    </div>
+async function recognizeByAPI(file) {
+  const fd = new FormData();
+  fd.append("file", file);
 
-    <!-- 分頁內容：遠端監控 -->
-    <div id="monitoring" class="tab-content">
-        <h2>遠端監控</h2>
-        <p>這裡未來會新增遠端監控的相關成果。</p>
-    </div>
+  const base = API_BASE.replace(/\/+$/, "");
+  const url = `${base}/recognize`;   // ✅ 只用這個
 
-    <!-- 分頁內容：血壓偵測 -->
-    <div id="bloodPressure" class="tab-content">
-        <h2>血壓偵測</h2>
-        <p class="bp-small">
-            說明：上傳血壓計照片（建議先裁切到螢幕、避免反光）→ 呼叫 Hugging Face Space API →
-            取得 SYS / DIA / PUL → 依據網站內 bp_data.json（基準）+ localStorage（新增）做趨勢判斷並可匯出合併 JSON。
-        </p>
+  console.log("[BP] POST ->", url);
 
-        <!-- 上傳 + 辨識 -->
-        <div class="bp-card">
-            <div class="bp-row">
-                <input id="bpFile" class="bp-input" type="file" accept="image/*">
-                <button id="bpRecognizeBtn" class="bp-btn" disabled>辨識</button>
-                <span id="bpStatus" class="bp-small">載入中…</span>
-            </div>
-        </div>
+  const res = await fetch(url, { method: "POST", body: fd });
+  const text = await res.text();
 
-        <!-- 預覽 -->
-        <div class="bp-card">
-            <div class="bp-kpi">預覽</div>
-            <img id="bpPreview" class="bp-img" alt="">
-        </div>
+  let data = null;
+  try { data = JSON.parse(text); } catch {}
 
-        <!-- 辨識結果 -->
-        <div class="bp-card">
-            <div class="bp-kpi">辨識結果</div>
-            <div id="bpResult">尚未辨識</div>
-        </div>
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status} at ${url}: ${text.slice(0,200)}`);
+  }
+  return data ?? { ok: false, error: "Non-JSON response", raw: text };
+}
 
-        <!-- 趨勢判斷 + 匯出 -->
-        <div class="bp-card">
-            <div class="bp-kpi">趨勢判斷</div>
-            <div id="bpTrend" style="margin-top:10px;"></div>
 
-            <div class="bp-row" style="margin-top:10px;">
-                <button id="bpExportBtn" type="button" class="bp-btn">匯出 bp_data（JSON）</button>
-                <span class="bp-small">※ 僅供專題展示參考，不能替代醫療建議</span>
-            </div>
-        </div>
+// ===== UI 綁定 =====
+window.addEventListener("DOMContentLoaded", () => {
+  const fileEl = $("bpFile");
+  const previewEl = $("bpPreview");
+  const statusEl = $("bpStatus");
+  const resultEl = $("bpResult");
+  const judgeOutEl = $("bpJudgeOut");
 
-        <!-- 歷史紀錄（只在血壓分頁出現） -->
-        <div class="bp-card">
-            <div class="bp-kpi">歷史紀錄（localStorage）</div>
-            <div class="bp-row">
-                <button id="bpClearBtn" class="bp-btn">清空紀錄</button>
-                <span class="bp-small">（只會清你這個瀏覽器的紀錄）</span>
-            </div>
-            <div id="bpHistory" style="margin-top:8px;"></div>
-        </div>
-    </div>
-</div>
+  const recognizeBtn = $("bpRecognizeBtn");
+  const judgeBtn = $("bpJudgeBtn");
+  const clearBtn = $("bpClearBtn");
 
-<footer>
-    <p>© 2025 胡智強. All Rights Reserved.</p>
-</footer>
+  if (!fileEl || !previewEl || !resultEl || !recognizeBtn) return;
 
-<script>
-    function showTab(tabName) {
-        const tabs = document.querySelectorAll('.tab-content');
-        tabs.forEach(tab => tab.classList.remove('active'));
+  // API 版：不需要 OpenCV.js，直接可用
+  recognizeBtn.disabled = false;
+  if (statusEl) statusEl.textContent = "就緒 ✅（使用 PaliGemma API）";
 
-        const activeTab = document.getElementById(tabName);
-        activeTab.classList.add('active');
+  fileEl.addEventListener("change", () => {
+    const f = fileEl.files?.[0];
+    if (!f) return;
+    previewEl.src = URL.createObjectURL(f);
+    resultEl.textContent = "已選擇圖片，按「辨識」";
+    if (judgeOutEl) judgeOutEl.textContent = "";
+  });
+
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      history = [];
+      saveHistory();
+      last = { sys:null, dia:null, pul:null };
+      if (judgeBtn) judgeBtn.disabled = true;
+      if (resultEl) resultEl.textContent = "已清空紀錄";
+      if (judgeOutEl) judgeOutEl.textContent = "";
+    });
+  }
+
+  recognizeBtn.addEventListener("click", async () => {
+    const f = fileEl.files?.[0];
+    if (!f) { alert("請先選擇圖片"); return; }
+
+    recognizeBtn.disabled = true;
+    if (statusEl) statusEl.textContent = "辨識中…";
+
+    try {
+      const j = await recognizeByAPI(f);
+
+      if (!j || !j.ok) {
+        const err = j?.error ? String(j.error) : "unknown";
+        resultEl.innerHTML =
+          `<span style="color:#b00020;font-weight:bold">辨識失敗</span><br>` +
+          `error: ${err}<br>` +
+          `raw: <pre style="white-space:pre-wrap">${JSON.stringify(j?.raw ?? j, null, 2)}</pre>`;
+        if (judgeBtn) judgeBtn.disabled = true;
+        if (statusEl) statusEl.textContent = "就緒";
+        return;
+      }
+
+      last = { sys: j.sys, dia: j.dia, pul: j.pul };
+
+      resultEl.innerHTML =
+        `SYS: <b>${j.sys}</b> / DIA: <b>${j.dia}</b> / PUL: <b>${j.pul}</b>`;
+
+      // 寫入歷史（t = 0,1,2...）
+      history.push({ t: history.length, sys: j.sys, dia: j.dia, pul: j.pul, ts: Date.now() });
+      saveHistory();
+
+      if (judgeBtn) judgeBtn.disabled = false;
+      if (statusEl) statusEl.textContent = "就緒 ✅";
+    } catch (e) {
+      console.error(e);
+      resultEl.innerHTML =
+        `<span style="color:#b00020;font-weight:bold">呼叫 API 失敗</span><br>` +
+        `<span class="bp-small">${String(e)}</span>`;
+      if (judgeBtn) judgeBtn.disabled = true;
+      if (statusEl) statusEl.textContent = "就緒";
+    } finally {
+      recognizeBtn.disabled = false;
     }
-</script>
+  });
 
-<!-- 血壓偵測主程式 -->
-<script src="./bp.js?v=20260104"></script>
+  if (judgeBtn) {
+    judgeBtn.addEventListener("click", () => {
+      if (last.sys == null || last.dia == null) { alert("請先辨識"); return; }
 
-</body>
-</html>
+      // 最近一次 push 進 history 的那筆，就是本次 t
+      const t = history.length - 1;
+
+      const a_sys = parseFloat($("bp_a_sys").value);
+      const b_sys = parseFloat($("bp_b_sys").value);
+      const a_dia = parseFloat($("bp_a_dia").value);
+      const b_dia = parseFloat($("bp_b_dia").value);
+      const thr = parseFloat($("bp_thr").value);
+
+      const s = judgeOne(last.sys, a_sys, b_sys, t, thr);
+      const d = judgeOne(last.dia, a_dia, b_dia, t, thr);
+
+      const overall = (s.out || d.out)
+        ? `<span style="color:#b00020;font-weight:bold">脫模（偏離趨勢）</span>`
+        : `<span style="color:#0a7a2f;font-weight:bold">正常（符合趨勢）</span>`;
+
+      if (judgeOutEl) {
+        judgeOutEl.innerHTML = `
+          <div><b>總結：</b>${overall}</div>
+          <div>SYS：ŷ=${s.yhat.toFixed(2)}，誤差=${s.err.toFixed(2)} → ${s.out ? '<b style="color:#b00020">脫模</b>' : '<b style="color:#0a7a2f">正常</b>'}</div>
+          <div>DIA：ŷ=${d.yhat.toFixed(2)}，誤差=${d.err.toFixed(2)} → ${d.out ? '<b style="color:#b00020">脫模</b>' : '<b style="color:#0a7a2f">正常</b>'}</div>
+          <div>PUL：<b>${last.pul ?? "-"}</b>（目前未納入趨勢判斷）</div>
+        `;
+      }
+    });
+  }
+});
