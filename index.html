@@ -136,37 +136,24 @@
             取得 SYS / DIA / PUL → 再用你輸入的線性趨勢係數判斷是否脫模。
         </p>
 
-        <div class="bp-card">
-            <div class="bp-row">
-                <input id="bpFile" class="bp-input" type="file" accept="image/*">
-                <button id="bpRecognizeBtn" class="bp-btn" disabled>辨識</button>
-                <span id="bpStatus" class="bp-small">載入中…</span>
-            </div>
-        </div>
+    <div class="bp-card">
+      <div class="bp-kpi">趨勢判斷</div>
+      <div id="bpTrend" style="margin-top:10px;"></div>
+      <div class="bp-row" style="margin-top:10px;">
+        <button id="bpExportBtn" type="button" class="bp-btn">匯出 bp_data（JSON）</button>
+        <span class="bp-small">※ 僅供專題展示參考，不能替代醫療建議</span>
+      </div>
+    </div>
 
-        <div class="bp-card">
-            <div>預覽：</div>
-            <img id="bpPreview" class="bp-img" alt="">
-        </div>
+    <div class="bp-card">
+      <div class="bp-kpi">歷史紀錄（localStorage）</div>
+      <div class="bp-row">
+        <button id="bpClearBtn" class="bp-btn">清空紀錄</button>
+        <span class="bp-small">（只會清你這個瀏覽器的紀錄）</span>
+      </div>
+      <div id="bpHistory" style="margin-top:8px;"></div>
+    </div>
 
-        <div class="bp-card">
-            <div class="bp-kpi">辨識結果</div>
-            <div id="bpResult">尚未辨識</div>
-        </div>
-
-        <div id="bpTrend" style="margin-top:10px;"></div>
-        <button id="bpExportBtn" type="button">匯出 bp_data（JSON）</button>
-
-            <div class="bp-small">※ 僅供專題展示參考，不能替代醫療建議</div>
-        </div>
-
-        <div class="bp-card">
-            <div class="bp-kpi">歷史紀錄（localStorage）</div>
-            <div class="bp-row">
-                <button id="bpClearBtn" class="bp-btn">清空紀錄</button>
-                <span class="bp-small">（只會清你這個瀏覽器的紀錄）</span>
-                <div id="bpHistory" style="margin-top:8px;"></div>
-            </div>
     </div>
 </div>
 
