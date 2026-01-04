@@ -129,7 +129,7 @@
   <div class="bp-card">
     <div class="bp-row">
       <label>ESP32-CAM 位址：</label>
-      <input id="camIp" class="bp-input" placeholder="例如 http://192.168.1.87 或 /cam" style="min-width:260px" />
+      <input id="camIp" class="bp-input" placeholder="例如 https://cam.111252210.xyz" style="min-width:260px" />
       <button id="camConnect" class="bp-btn">連線</button>
       <span id="camStatus" class="bp-small" style="color:#4CAF50;">未連線</span>
     </div>
@@ -236,7 +236,7 @@
     const ok  = (msg)=>{ statusEl.textContent = msg||'OK'; statusEl.style.color = '#4CAF50'; }
     const bad = (msg)=>{ statusEl.textContent = msg||'錯誤'; statusEl.style.color = '#ff6565'; }
 
-    let CAM_BASE = localStorage.getItem('cam_base') || 'http://192.168.1.87';
+    let CAM_BASE = localStorage.getItem('cam_base') || 'https://cam.111252210.xyz';
     let ledOn = false, pollTimer = null;
 
     function setBase(url){
