@@ -185,7 +185,7 @@
             <div class="bp-small">※ 僅供專題展示參考，不能替代醫療建議</div>
         </div>
 
-        <div class="bp-card">
+        <div id="bpHistoryCard" class="bp-card" style="display:none;">
             <div class="bp-kpi">歷史紀錄（localStorage）</div>
             <div class="bp-row">
                 <button id="bpClearBtn" class="bp-btn">清空紀錄</button>
@@ -205,8 +205,18 @@
         tabs.forEach(tab => tab.classList.remove('active'));
 
         const activeTab = document.getElementById(tabName);
-        activeTab.classList.add('active');
-    }
+       
+// Hide history card at load if not on bloodPressure
+(function(){
+  const bpHist = document.getElementById('bpHistoryCard');
+  if (bpHist) { bpHist.style.display = document.getElementById('bloodPressure')?.classList.contains('active') ? '' : 'none'; }
+})();
+ activeTab.classList.add('active');
+    
+        // Toggle BP history card visibility only on bloodPressure tab
+        const bpHist = document.getElementById('bpHistoryCard');
+        if (bpHist) { bpHist.style.display = (tabName === 'bloodPressure') ? '' : 'none'; }
+}
 </script>
 
 <script>
