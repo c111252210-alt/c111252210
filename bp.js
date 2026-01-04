@@ -147,7 +147,7 @@ function rebuildMerged() {
 }
 
 // ------------------------ trend judgement ------------------------
-function judgeTrendForNewPoint(newPoint, windowSize = 30, k = 3.0, minAbsThr = 8) {
+function judgeTrendForNewPoint(newPoint, k = 3.0, minAbsThr = 8) {
   // Use last windowSize points (before adding newPoint) to fit trend
   if (mergedData.length < 5) {
     return {
@@ -157,7 +157,7 @@ function judgeTrendForNewPoint(newPoint, windowSize = 30, k = 3.0, minAbsThr = 8
     };
   }
 
-  const hist = mergedData.slice(-windowSize);
+  const hist = mergedData;
   const ts = hist.map(r => r.t);
 
   function judgeOne(metric) {
@@ -216,7 +216,6 @@ function judgeTrendForNewPoint(newPoint, windowSize = 30, k = 3.0, minAbsThr = 8
       ${line(s, "SYS")}
       ${line(d, "DIA")}
       <div>PUL：<b>${newPoint.pul ?? "-"}</b>（目前不納入趨勢判斷）</div>
-      <small style="opacity:.8">註：使用最近 ${Math.min(windowSize, mergedData.length)} 筆做線性回歸；門檻=max(${minAbsThr}, ${k}×MAD估計σ)。</small>
     `
   };
 }
