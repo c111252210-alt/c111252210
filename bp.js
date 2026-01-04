@@ -1,9 +1,8 @@
-// bp.js (FULL REPLACE)
+// bp.js (FULL REPLACE) — POST /recognize (multipart/form-data)
 
 const LS_KEY = "bp_history_v1";
 let history = JSON.parse(localStorage.getItem(LS_KEY) || "[]");
 
-// ✅ 你的 Hugging Face Space
 const API_BASE = "https://smile950123-bp-paligemma-api.hf.space";
 
 function $(id) { return document.getElementById(id); }
@@ -39,18 +38,8 @@ function judgeOne(y, a, b, t, thr) {
   return { yhat, err, out: Math.abs(err) > thr };
 }
 
-// ====== 影像轉 dataURL（base64） ======
-async function fileToDataURL(file) {
-  return await new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(r.result);
-    r.onerror = reject;
-    r.readAsDataURL(file);
-  });
-}
-
-// （可選，但建議）先縮圖再轉 base64，避免太大、加速上傳與推論
-async function compressToDataURL(file, maxSize = 1024, quality = 0.85) {
+// ✅ 壓縮圖片成 JPEG File（減少檔案大小，避免代理/平台擋）
+async function compressImage(file, maxSize = 1024, quality = 0.85) {
   const img = new Image();
   const url = URL.createObjectURL(file);
   img.src = url;
@@ -62,14 +51,14 @@ async function compressToDataURL(file, maxSize = 1024, quality = 0.85) {
 
   let { width, height } = img;
   const scale = Math.min(1, maxSize / Math.max(width, height));
-  const w = Math.max(1, Math.round(width * scale));
-  const h = Math.max(1, Math.round(height * scale));
+  width = Math.max(1, Math.round(width * scale));
+  height = Math.max(1, Math.round(height * scale));
 
   const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext("2d");
-  ctx.drawImage(img, 0, 0, w, h);
+  ctx.drawImage(img, 0, 0, width, height);
 
   URL.revokeObjectURL(url);
 
@@ -77,31 +66,26 @@ async function compressToDataURL(file, maxSize = 1024, quality = 0.85) {
     canvas.toBlob(resolve, "image/jpeg", quality)
   );
 
-  // blob -> dataURL
-  return await new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(r.result);
-    r.onerror = reject;
-    r.readAsDataURL(blob);
-  });
+  return new File([blob], "bp.jpg", { type: "image/jpeg" });
 }
 
-// ====== 呼叫後端：改用 /recognize_b64 (JSON) ======
 async function recognizeByAPI(file) {
   const base = API_BASE.replace(/\/+$/, "");
-  const url = `${base}/recognize_b64`; // ✅ 走 JSON base64，避免跨站 multipart 被擋
+  const url = `${base}/recognize`; // ✅ only /recognize
   console.log("[BP] POST ->", url);
 
-  // 建議用壓縮版本
-  const dataURL = await compressToDataURL(file, 1024, 0.85);
+  // 壓縮後再傳
+  const smallFile = await compressImage(file, 1024, 0.85);
+
+  const fd = new FormData();
+  fd.append("file", smallFile);
 
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    body: fd,
     mode: "cors",
     credentials: "omit",
     cache: "no-store",
-    body: JSON.stringify({ image_b64: dataURL }),
   });
 
   const text = await res.text();
@@ -114,7 +98,6 @@ async function recognizeByAPI(file) {
   return data ?? { ok: false, error: "Non-JSON response", raw: text };
 }
 
-// ====== UI 綁定 ======
 window.addEventListener("DOMContentLoaded", async () => {
   const fileEl = $("bpFile");
   const previewEl = $("bpPreview");
@@ -130,18 +113,19 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   if (!fileEl || !previewEl || !resultEl || !recognizeBtn) return;
 
-  // 讓按鈕一開始就可按（不依賴 OpenCV.js）
   recognizeBtn.disabled = false;
 
-  // 啟動時先測 /health（可快速確認 API_BASE）
+  // health check（可看 Space 是否可被匿名存取）
   if (statusEl) statusEl.textContent = "檢查後端連線中…";
   try {
     const base = API_BASE.replace(/\/+$/, "");
-    const r = await fetch(`${base}/health`, { cache: "no-store" });
+    const r = await fetch(`${base}/health`, { cache: "no-store", credentials: "omit" });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const j = await r.json();
     if (statusEl) statusEl.textContent = `後端OK ✅ (${j.device}, ${j.model})`;
   } catch (e) {
-    if (statusEl) statusEl.textContent = `後端連線失敗：${String(e)}`;
+    if (statusEl) statusEl.textContent =
+      `後端連線失敗（Space 若為 Private 會被擋）：${String(e)}`;
   }
 
   fileEl.addEventListener("change", () => {
@@ -189,7 +173,6 @@ window.addEventListener("DOMContentLoaded", async () => {
       resultEl.innerHTML =
         `SYS: <b>${j.sys}</b> / DIA: <b>${j.dia}</b> / PUL: <b>${j.pul}</b>`;
 
-      // 寫入歷史（t = 0,1,2...）
       history.push({ t: history.length, sys: j.sys, dia: j.dia, pul: j.pul, ts: Date.now() });
       saveHistory();
 
