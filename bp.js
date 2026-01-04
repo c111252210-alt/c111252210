@@ -64,7 +64,13 @@ async function recognizeByAPI(file) {
   const fd = new FormData();
   fd.append("file", smallFile);
 
-  const res = await fetch(url, { method: "POST", body: fd });
+  const res = await fetch(url, {
+  method: "POST",
+  body: fd,
+  mode: "cors",
+  credentials: "omit", // ✅ 不帶 cookie，降低被平台誤判風險
+  cache: "no-store"
+});
   const text = await res.text();
 
   let data = null;
