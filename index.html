@@ -154,25 +154,9 @@
             <div id="bpResult">尚未辨識</div>
         </div>
 
-        <div class="bp-card">
-            <div class="bp-kpi">線性趨勢 + 脫模判斷</div>
-            <div class="bp-small">用第 t 次量測（t=0,1,2…）代入：ŷ = a*t + b；若 |y-ŷ| &gt; 閾值 → 脫模。</div>
+        <div id="bpTrend" style="margin-top:10px;"></div>
+        <button id="bpExportBtn" type="button">匯出 bp_data（JSON）</button>
 
-            <div class="bp-row" style="margin-top:8px;">
-                <label>SYS a <input id="bp_a_sys" class="bp-input" type="number" step="0.01" value="0"></label>
-                <label>SYS b <input id="bp_b_sys" class="bp-input" type="number" step="0.01" value="120"></label>
-            </div>
-            <div class="bp-row">
-                <label>DIA a <input id="bp_a_dia" class="bp-input" type="number" step="0.01" value="0"></label>
-                <label>DIA b <input id="bp_b_dia" class="bp-input" type="number" step="0.01" value="80"></label>
-            </div>
-
-            <div class="bp-row">
-                <label>脫模閾值(mmHg) <input id="bp_thr" class="bp-input" type="number" value="10"></label>
-                <button id="bpJudgeBtn" class="bp-btn" disabled>判斷</button>
-            </div>
-
-            <div id="bpJudgeOut" style="margin-top:8px;"></div>
             <div class="bp-small">※ 僅供專題展示參考，不能替代醫療建議</div>
         </div>
 
